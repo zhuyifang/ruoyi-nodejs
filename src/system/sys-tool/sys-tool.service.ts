@@ -11,9 +11,9 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import * as path from 'node:path';
-import * as fs from 'fs-extra';
+import * as fs from 'fs/promises';
 import * as Handlebars from 'handlebars';
-import { capitalCase, camelCase, kebabCase, pascalCase } from 'change-case';
+import { capitalCase, camelCase, pascalCase } from 'change-case';
 import { GenerateFromTableDto } from './dto/generate-from-table.dto';
 import { GenerateCodeDto, FieldDto } from './dto/generate-code.dto';
 import { SysMenuService } from '@/system/sys-menu/sys-menu.service';
@@ -189,7 +189,6 @@ export class SysToolService implements OnModuleInit {
   }
 
   private async addModuleToMenu(moduleName: string, entityName: string) {
-    try {
       const menuName = `${this.pascalToTitleCase(entityName)}管理`;
       const menuData: CreateMenuDto = {
         parentId: 0,
@@ -203,9 +202,6 @@ export class SysToolService implements OnModuleInit {
       };
       await this.sysMenuService.create(menuData);
       this.logger.log(`成功为模块 [${moduleName}] 创建顶级菜单: ${menuName}`);
-    } catch (error) {
-      this.logger.warn(`为模块 [${moduleName}] 创建菜单失败: ${error.message}`);
-    }
   }
 
   // 【关键修复】修正此方法的类型签名
@@ -238,7 +234,7 @@ export class SysToolService implements OnModuleInit {
 
     const dtoPath = path.join(basePath, 'dto');
 
-    await fs.ensureDir(dtoPath);
+    await fs.mkdir(dtoPath);
 
     const filesToGenerate = [
       {
