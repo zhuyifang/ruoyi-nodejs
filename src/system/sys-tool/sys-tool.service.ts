@@ -87,9 +87,7 @@ export class SysToolService implements OnModuleInit {
       }
       const isSystemTable = dto.tableName.startsWith('sys_');
       if (!isSystemTable && !dto.pluginDir) {
-        throw new BadRequestException(
-          "对于非系统表，必须提供 'pluginDir' 字段。",
-        );
+        throw new BadRequestException("对于非系统表，必须提供 'pluginDir' 字段。");
       }
 
       let moduleName: string;
@@ -163,23 +161,22 @@ export class SysToolService implements OnModuleInit {
   private mapDbTypeToTsType(
     dbType: string,
   ): 'string' | 'number' | 'boolean' | 'Date' {
-    dbType = dbType.toLowerCase();
-    if (['varchar', 'text', 'char', 'string'].some((t) => dbType.includes(t))) {
-      return 'string';
+    const lowerDbType = dbType.toLowerCase();
+
+    const typeMappings = [
+      { keys: ['int', 'integer', 'decimal', 'double', 'float', 'real', 'numeric'], type: 'number' as const },
+      { keys: ['boolean', 'tinyint(1)', 'bit'], type: 'boolean' as const },
+      { keys: ['datetime', 'timestamp', 'date'], type: 'Date' as const },
+      // 将 string 类型作为默认情况，可以放在最后或不在此处列出
+      { keys: ['varchar', 'text', 'char', 'string'], type: 'string' as const },
+    ];
+
+    for (const mapping of typeMappings) {
+      if (mapping.keys.some((key) => lowerDbType.includes(key))) {
+        return mapping.type;
+      }
     }
-    if (
-      ['int', 'integer', 'decimal', 'double', 'float', 'real', 'numeric'].some(
-        (t) => dbType.includes(t),
-      )
-    ) {
-      return 'number';
-    }
-    if (['boolean', 'tinyint(1)', 'bit'].some((t) => dbType.includes(t))) {
-      return 'boolean';
-    }
-    if (['datetime', 'timestamp', 'date'].some((t) => dbType.includes(t))) {
-      return 'Date';
-    }
+
     return 'string';
   }
 
@@ -204,18 +201,16 @@ export class SysToolService implements OnModuleInit {
       this.logger.log(`成功为模块 [${moduleName}] 创建顶级菜单: ${menuName}`);
   }
 
-  // 【关键修复】修正此方法的类型签名
   private async generateFiles(
-    context: GenerateCodeDto & {
-      hasTimestamps?: boolean;
-      hasUserStamps?: boolean;
-      modulePrefix?: string;
-      tableName?: string;
-    },
-    moduleType: 'system' | 'application',
-    pluginDir?: string,
+      context: GenerateCodeDto & {
+        hasTimestamps?: boolean;
+        hasUserStamps?: boolean;
+        modulePrefix?: string;
+        tableName?: string;
+      },
+      moduleType: 'system' | 'application',
+      pluginDir?: string,
   ) {
-    // 现在 context 对象包含了所有需要的数据，包括 modulePrefix
     const { moduleName, entityName } = context;
 
     if (!/^[a-zA-Z0-9-_]+$/.test(moduleName)) {
@@ -232,54 +227,43 @@ export class SysToolService implements OnModuleInit {
       basePath = path.join(process.cwd(), 'src', 'plugins', pluginDir);
     }
 
-    const dtoPath = path.join(basePath, 'dto');
+    // 【优化】动态发现模板，而不是硬编码
+    const allTemplateFiles = await fs.readdir(this.templateDir);
 
-    await fs.mkdir(dtoPath);
+    for (const templateFile of allTemplateFiles) {
+      // 忽略非 .hbs 文件和 partials (以下划线开头的文件)
+      if (!templateFile.endsWith('.hbs') || templateFile.startsWith('_')) {
+        continue;
+      }
 
-    const filesToGenerate = [
-      {
-        template: 'module.hbs',
-        output: path.join(basePath, `${moduleName}.module.ts`),
-      },
-      {
-        template: 'controller.hbs',
-        output: path.join(basePath, `${moduleName}.controller.ts`),
-      },
-      {
-        template: 'service.hbs',
-        output: path.join(basePath, `${moduleName}.service.ts`),
-      },
-      {
-        template: 'entity.hbs',
-        output: path.join(basePath, `${moduleName}.entity.ts`),
-      },
-      {
-        template: 'create-dto.hbs',
-        output: path.join(dtoPath, `create-${moduleName}.dto.ts`),
-      },
-      {
-        template: 'query-dto.hbs',
-        output: path.join(dtoPath, `query-${moduleName}.dto.ts`),
-      },
-      {
-        template: 'update-dto.hbs',
-        output: path.join(dtoPath, `update-${moduleName}.dto.ts`),
-      },
-      {
-        template: 'delete-dto.hbs',
-        output: path.join(dtoPath, `delete-${moduleName}.dto.ts`),
-      },
-    ];
-
-    for (const file of filesToGenerate) {
       const templateContent = await fs.readFile(
-        path.join(this.templateDir, file.template),
-        'utf-8',
+          path.join(this.templateDir, templateFile),
+          'utf-8',
       );
       const template = Handlebars.compile(templateContent);
       const renderedContent = template(context);
-      await fs.writeFile(file.output, renderedContent);
-      this.logger.log(`成功生成文件: ${file.output}`);
+
+      // 根据模板文件名动态确定输出路径
+      let outputDir = basePath;
+      let outputFileName = templateFile.replace('.hbs', '.ts');
+
+      if (outputFileName.includes('-dto')) {
+        // 如果是 DTO 文件，则放入 'dto' 子目录
+        outputDir = path.join(basePath, 'dto');
+        outputFileName = outputFileName.replace('-dto', `-${moduleName}.dto`);
+      } else {
+        // 其他文件直接使用模块名
+        outputFileName = outputFileName.replace(
+            path.basename(outputFileName, '.ts'), // e.g., 'module' or 'controller'
+            moduleName,
+        );
+      }
+
+      const outputPath = path.join(outputDir, outputFileName);
+
+      await fs.mkdir(path.dirname(outputPath), { recursive: true });
+      await fs.writeFile(outputPath, renderedContent);
+      this.logger.log(`成功生成文件: ${outputPath}`);
     }
 
     if (moduleType === 'application') {
