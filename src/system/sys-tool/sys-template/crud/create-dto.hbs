@@ -1,0 +1,7 @@
+// src/{{moduleName}}/dto/create-{{moduleName}}.dto.ts
+import { IsString, IsNumber, IsBoolean, IsDate, IsNotEmpty, IsOptional } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class Create{{entityName}}Dto {
+    {{> _common-fields isCreateDto=true}}
+}

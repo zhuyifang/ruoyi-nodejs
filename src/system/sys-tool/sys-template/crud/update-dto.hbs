@@ -1,0 +1,8 @@
+// src/{{moduleName}}/dto/update-{{moduleName}}.dto.ts
+import { IsString, IsNumber, IsBoolean, IsDate, IsOptional } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+
+export class Update{{entityName}}Dto {
+    {{> _common-fields isUpdateDto=true}}
+}

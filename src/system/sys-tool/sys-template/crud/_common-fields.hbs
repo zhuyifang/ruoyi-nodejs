@@ -1,0 +1,48 @@
+{{#each fields}}
+    {{#if ../isEntity}}
+        {{! 为实体属性添加 4 个空格的缩进 }}
+        @Column({ comment: '{{this.comment}}'{{#if this.isNullable}}, nullable: true{{/if}} })
+        {{this.name}}: {{this.type}};
+    {{/if}}
+    {{#if (any ../isCreateDto ../isUpdateDto ../isQueryDto)}}
+        {{! 为 DTO 属性的每一行都添加 4 个空格的缩进 }}
+        {{#if ../isCreateDto~}}
+        @ApiProperty({ description: '{{this.comment}}'{{#if this.isNullable}}, required: false, nullable: true{{/if}} })
+            {{#if this.isNullable}}
+        @IsOptional()
+            {{else}}
+        @IsNotEmpty({ message: '{{this.comment}} 不能为空' })
+            {{/if}}
+        {{~else~}}
+        @ApiPropertyOptional({ description: '{{this.comment}}' })
+        @IsOptional()
+        {{~/if}}
+        {{~#if ../isQueryDto}}
+            {{~#if (eq this.type 'number')}}
+        @Type(() => Number)
+            {{~/if}}
+            {{~#if (eq this.type 'boolean')}}
+        @Type(() => Boolean)
+            {{~/if}}
+            {{~#if (eq this.type 'Date')}}
+        @Type(() => Date)
+            {{~/if}}
+        {{~/if}}
+        {{~#if (eq this.type 'string')}}
+        @IsString()
+        {{~/if}}
+        {{~#if (eq this.type 'number')}}
+        @IsNumber()
+        {{~/if}}
+        {{~#if (eq this.type 'boolean')}}
+        @IsBoolean()
+        {{~/if}}
+        {{~#if (eq this.type 'Date')}}
+        @IsDate()
+        {{~/if}}
+        {{this.name}}{{#if (any ../isUpdateDto ../isQueryDto this.isNullable)}}?{{/if}}: {{this.type}};
+    {{/if}}
+{{#unless @last}}
+
+{{/unless}}
+{{/each}}

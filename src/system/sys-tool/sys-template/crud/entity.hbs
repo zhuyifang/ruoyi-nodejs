@@ -1,0 +1,31 @@
+// src/{{moduleName}}/{{moduleName}}.entity.ts
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    UpdateDateColumn,
+} from 'typeorm';
+
+@Entity('{{tableName}}')
+export class {{entityName}} {
+    @PrimaryGeneratedColumn()
+    id: number;
+{{> _common-fields isEntity=true}}
+
+    {{#if hasTimestamps}}
+    @CreateDateColumn({ comment: '创建时间' })
+    createdAt: Date;
+
+    @UpdateDateColumn({ comment: '更新时间' })
+    updatedAt: Date;
+    {{/if}}
+
+    {{#if hasUserStamps}}
+    @Column({ comment: '创建人ID', nullable: true })
+    createdBy: number;
+
+    @Column({ comment: '最后更新人ID', nullable: true })
+    updatedBy: number;
+    {{/if}}
+}

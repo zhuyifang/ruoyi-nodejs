@@ -1,0 +1,68 @@
+// src/{{moduleName}}/{{moduleName}}.service.ts
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, In } from 'typeorm';
+import { BaseService } from '@/common/services/base.service';
+import { PaginationDto } from '@/common/dto/pagination.dto';
+import { {{entityName}} } from './{{moduleName}}.entity';
+import { Create{{entityName}}Dto } from './dto/create-{{moduleName}}.dto';
+import { Update{{entityName}}Dto } from './dto/update-{{moduleName}}.dto';
+import { Query{{entityName}}Dto } from './dto/query-{{moduleName}}.dto';
+
+@Injectable()
+// 【修复】统一 Service 类名
+export class Plugin{{modulePrefix}}Service extends BaseService<{{entityName}}> {
+    private readonly safeSortByFields = [{{#each fields}}'{{this.name}}', {{/each}}'createdAt', 'updatedAt'];
+
+    constructor(
+        @InjectRepository({{entityName}})
+        private readonly {{camelCase modulePrefix}}Repository: Repository<{{entityName}}>,
+    ) {
+        super({{camelCase modulePrefix}}Repository);
+    }
+
+    async create(createDto: Create{{entityName}}Dto): Promise<{{entityName}}> {
+        // 【修复】统一 Repository 变量名
+        const entity = this.{{camelCase modulePrefix}}Repository.create(createDto);
+        return this.{{camelCase modulePrefix}}Repository.save(entity);
+    }
+
+    async findAll(paginationDto: PaginationDto, queryDto: Query{{entityName}}Dto): Promise<{ list: {{entityName}}[], total: number }> {
+        return this.paginate(paginationDto, queryDto, {}, this.safeSortByFields);
+    }
+
+    async findOne(id: number): Promise<{{entityName}}> {
+        // 【修复】统一 Repository 变量名
+        const entity = await this.{{camelCase modulePrefix}}Repository.findOne({ where: { id } });
+        if (!entity) {
+            throw new NotFoundException(`ID 为 ${id} 的记录未找到`);
+        }
+        return entity;
+    }
+
+    async update(id: number, updateDto: Update{{entityName}}Dto): Promise<{{entityName}}> {
+        const entityToUpdate = await this.findOne(id);
+        Object.assign(entityToUpdate, updateDto);
+        // 【修复】统一 Repository 变量名
+        return this.{{camelCase modulePrefix}}Repository.save(entityToUpdate);
+    }
+
+    async remove(id: number): Promise<void> {
+        // 【修复】统一 Repository 变量名
+        const result = await this.{{camelCase modulePrefix}}Repository.delete(id);
+        if (result.affected === 0) {
+            throw new NotFoundException(`ID 为 ${id} 的记录未找到，无法删除`);
+        }
+    }
+
+    async bulkRemove(ids: number[]): Promise<void> {
+        if (!ids || ids.length === 0) {
+            return;
+        }
+        // 【修复】统一 Repository 变量名
+        const result = await this.{{camelCase modulePrefix}}Repository.delete({ id: In(ids) } as any);
+        if (result.affected === 0) {
+            throw new NotFoundException(`提供的 ID 均未找到，无法删除`);
+        }
+    }
+}

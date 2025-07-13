@@ -1,0 +1,4 @@
+    # .prettierignore
+
+    # 忽略所有 Handlebars 模板，防止破坏我们精心设计的格式
+    src/system/sys-tool/sys-template/crud/*.hbs

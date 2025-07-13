@@ -1,0 +1,55 @@
+// src/{{moduleName}}/{{moduleName}}.controller.ts
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, UseGuards, HttpCode, Query } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { Plugin{{modulePrefix}}Service } from './{{moduleName}}.service';
+import { Create{{entityName}}Dto } from './dto/create-{{moduleName}}.dto';
+import { Update{{entityName}}Dto } from './dto/update-{{moduleName}}.dto';
+import { Delete{{entityName}}Dto } from './dto/delete-{{moduleName}}.dto';
+import { PaginationDto } from '@/common/dto/pagination.dto';
+import { Query{{entityName}}Dto } from './dto/query-{{moduleName}}.dto';
+
+@Controller('/plugins/{{moduleName}}')
+@UseGuards(AuthGuard('jwt'))
+// 【修复】统一 Controller 类名
+export class Plugin{{modulePrefix}}Controller {
+    constructor(private readonly service: Plugin{{modulePrefix}}Service) {}
+
+    @Post()
+    // @RequirePermissions('plugin:{{moduleName}}:add')
+    create(@Body() createDto: Create{{entityName}}Dto) {
+        return this.service.create(createDto);
+    }
+
+    @Get()
+    // @RequirePermissions('plugin:{{moduleName}}:list')
+    findAll(@Query() paginationDto: PaginationDto, @Query() queryDto: Query{{entityName}}Dto) {
+        return this.service.findAll(paginationDto, queryDto);
+    }
+
+    @Get(':id')
+    // @RequirePermissions('plugin:{{moduleName}}:query')
+    findOne(@Param('id', ParseIntPipe) id: number) {
+        return this.service.findOne(id);
+    }
+
+    @Patch(':id')
+    // @RequirePermissions('plugin:{{moduleName}}:edit')
+    update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: Update{{entityName}}Dto) {
+        return this.service.update(id, updateDto);
+    }
+
+    @Delete(':id')
+    @HttpCode(204)
+    // @RequirePermissions('plugin:{{moduleName}}:remove')
+    remove(@Param('id', ParseIntPipe) id: number) {
+        return this.service.remove(id);
+    }
+
+    @Delete()
+    @HttpCode(204)
+    // @RequirePermissions('plugin:{{moduleName}}:remove')
+    bulkRemove(@Body() deleteDto: Delete{{entityName}}Dto) {
+        return this.service.bulkRemove(deleteDto.ids);
+    }
+}
