@@ -4,7 +4,8 @@ import {InjectRepository} from '@nestjs/typeorm';
 import {In, Repository} from 'typeorm';
 import {SysUser} from './sys-user.entity';
 import * as bcrypt from 'bcrypt';
-import {SysRole} from "../sys-role/sys-role.entity"; // 导入 bcrypt
+import {SysRole} from "../sys-role/sys-role.entity";
+import {CreateUserDto} from "./dto/create-user.dto"; // 导入 bcrypt
 @Injectable()
 export class SysUserService {
     constructor(
@@ -16,7 +17,7 @@ export class SysUserService {
     ) {}
 
     // 示例：创建一个新用户
-    async create(user: Partial<SysUser>): Promise<SysUser> {
+    async create(user: CreateUserDto): Promise<SysUser> {
         if (user.password) {
             user.password = await bcrypt.hash(user.password, 10);
         }
