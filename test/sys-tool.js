@@ -10,7 +10,7 @@ async function main() {
         });
 
         // 2. 正确提取 access_token
-        const token = loginResponse.data.access_token;
+        const token = loginResponse.data.data.access_token;
         console.log('成功获取 Token:', token);
 
         if (!token) {

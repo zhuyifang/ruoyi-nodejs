@@ -1,15 +1,12 @@
 // src/{{moduleName}}/dto/delete-{{moduleName}}.dto.ts
-import { IsArray, ArrayNotEmpty, IsInt } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class Delete{{entityName}}Dto {
-    @ApiProperty({
-        description: '要批量删除的 ID 数组',
-        type: [Number],
-        example: [1, 2, 3],
-    })
-    @IsArray({ message: 'ids 必须是数组' })
-    @ArrayNotEmpty({ message: 'ids 不能为空' })
-    @IsInt({ each: true, message: 'ids 数组中的每个元素都必须是整数' })
+// 【优化】使用 modulePrefix 命名DTO，使其更简洁 (e.g., DeleteSinglePageDto)
+export class Delete{{modulePrefix}}Dto {
+    @ApiProperty({ description: '需要删除的ID列表', type: [Number] })
+    @IsArray()
+    @IsNotEmpty()
+    @IsNumber({}, { each: true })
     ids: number[];
 }

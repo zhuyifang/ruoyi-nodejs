@@ -15,6 +15,8 @@ export class FieldDto {
     @IsString()
     @IsNotEmpty()
     comment: string; // 字段注释
+
+    isNullable?: boolean;
 }
 
 export class GenerateCodeDto {

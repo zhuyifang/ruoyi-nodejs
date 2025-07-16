@@ -56,31 +56,30 @@ export abstract class BaseService<T extends ObjectLiteral> {
      * 根据查询 DTO 和实体元数据，智能构建 TypeORM 的 Where 条件
      */
     private buildWhere<Q extends object>(queryDto: Q): FindOptionsWhere<T> {
-        const where: FindOptionsWhere<T> = {};
-        // 从 repository 获取当前实体的元数据
-        const entityMetadata = this.repository.metadata;
-
-        for (const key in queryDto) {
-            // 检查 DTO 中是否存在该键，并且值不为 null 或 undefined 或空字符串
-            if (queryDto[key] !== undefined && queryDto[key] !== null && queryDto[key] !== '') {
-                // 查找与 DTO 键匹配的实体列元数据
-                const column = entityMetadata.findColumnWithPropertyName(key);
-                const value = queryDto[key];
-
-                // 如果找到了对应的列元数据
-                if (column) {
-                    // 检查列的类型
-                    // TypeORM 中，string 类型的列通常是 'varchar', 'text' 等，或者直接是 String 构造函数
-                    if (column.type === String || (typeof column.type === 'string' && ['varchar', 'text', 'char'].includes(column.type))) {
-                        (where as any)[key] = Like(`%${value}%`);
-                    } else {
-                        // 对于 number, boolean, Date 等其他所有类型，使用精确匹配
-                        (where as any)[key] = value;
-                    }
-                }
-            }
+      const where: FindOptionsWhere<T> = {};
+      const entityMetadata = this.repository.metadata;
+  
+      for (const key in queryDto) {
+        const value = queryDto[key];
+  
+        // 1. 忽略 undefined 和 null 的值
+        if (value === undefined || value === null) {
+          continue;
         }
-        return where;
+  
+        // 2. 对于字符串，额外忽略空字符串
+        if (typeof value === 'string' && value.trim() === '') {
+          continue;
+        }
+  
+        const column = entityMetadata.findColumnWithPropertyName(key);
+        if (column) {
+          const isStringColumn = column.type === String || (typeof column.type === 'string' && ['varchar', 'text', 'char'].includes(column.type));
+          
+          (where as any)[key] = isStringColumn ? Like(`%${value}%`) : value;
+        }
+      }
+      return where;
     }
 
     /**

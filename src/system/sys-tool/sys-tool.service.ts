@@ -44,8 +44,81 @@ export class SysToolService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    Handlebars.registerHelper('eq', (a, b) => a === b);
+    // 【修复】将助记符 'eq' 重命名为 'isEq'，以匹配模板中的用法
+    Handlebars.registerHelper('isEq', (a, b) => a === b);
     Handlebars.registerHelper('or', (a, b) => a || b);
+    Handlebars.registerHelper('isMember', (item, listString) => {
+      if (typeof listString !== 'string') return false;
+      const list = listString.split(',').map((s) => s.trim());
+      return list.includes(item);
+    });
+    // 【架构升级】注册一个自定义辅助函数，以编程方式生成格式完美的 @Column 装饰器选项。
+    // 这可以从根本上解决模板中因条件逻辑而产生的多余空行和格式问题。
+    Handlebars.registerHelper('buildColOpts', function (column) {
+      // 【修复】明确指定 options 数组的类型为 string[]，以解决 TS2345 (Argument of type 'string' is not assignable to 'never') 错误
+      const options: string[] = [];
+      options.push(`type: '${column.columnType}'`);
+
+      // 服务层已将空的 length 转换为了 null
+      if (column.length !== null) {
+        options.push(`length: ${column.length}`);
+      }
+      if (column.isNullable) {
+        options.push(`nullable: true`);
+      }
+
+      const escapedComment = column.comment.replace(/'/g, "\\'");
+      options.push(`comment: '${escapedComment}'`);
+
+      return new Handlebars.SafeString(`{\n        ${options.join(',\n        ')}\n    }`);
+    });
+    // 【终极架构升级】注册一个更强大的辅助函数，用于生成所有DTO的验证装饰器。
+    // 这将复杂的条件逻辑从模板中完全移除，并以编程方式保证完美的输出格式。
+    Handlebars.registerHelper(
+      'buildValidationDecorators',
+      function (column, context) {
+        const decorators: string[] = [];
+        const indent = '    ';
+
+        // 1. ApiProperty & Nullability
+        if (context === 'create') {
+          const required = column.isNullable ? ', required: false' : '';
+          decorators.push(
+            `@ApiProperty({ description: '${column.comment}'${required} })`,
+          );
+          if (column.isNullable) {
+            decorators.push(`@IsOptional()`);
+          } else {
+            decorators.push(`@IsNotEmpty({ message: '${column.comment} 不能为空' })`);
+          }
+        } else {
+          // For 'update' and 'query' contexts
+          decorators.push(
+            `@ApiPropertyOptional({ description: '${column.comment}' })`,
+          );
+          decorators.push(`@IsOptional()`);
+        }
+
+        // 2. Type Validation & Transformation
+        const type = column.dataType;
+        if (type === 'boolean') {
+          if (context === 'query') {
+            decorators.push(`@Transform(({ value }) => value === 'true')`);
+          }
+          decorators.push(`@IsBoolean()`);
+        } else if (type === 'number') {
+          if (context === 'query') decorators.push(`@Type(() => Number)`);
+          decorators.push(`@IsNumber()`);
+        } else if (type === 'date') {
+          decorators.push(`@Type(() => Date)`);
+          decorators.push(`@IsDate()`);
+        } else {
+          decorators.push(`@IsString()`);
+        }
+
+        return new Handlebars.SafeString(decorators.join(`\n${indent}`));
+      },
+    );
     Handlebars.registerHelper('any', function (...args) {
       const _options = args.pop();
       return args.some(Boolean);
@@ -75,7 +148,27 @@ export class SysToolService implements OnModuleInit {
 
   async generate(dto: GenerateCodeDto) {
     try {
-      return await this.generateFiles(dto, 'system');
+      // 【修复】手动生成时，需要将 dto.fields 转换为模板期望的 columns 结构
+      const templateContext = {
+        ...dto,
+        modulePrefix: pascalCase(dto.moduleName),
+        tableName: dto.moduleName.replace(/-/g, '_'), // 最佳猜测
+        hasTimestamps: false, // 手动生成时不假定有时间戳
+        hasUserStamps: false, // 手动生成时不假定有用户戳
+        columns: dto.fields.map((field) => ({
+          isPrimary: false, // 手动生成时假定非主键
+          columnName: field.name,
+          propertyType: field.type,
+          dataType: field.type.toLowerCase(),
+          columnType: 'unknown',
+          length: null,
+          isNullable: field.isNullable,
+          comment: field.comment,
+        })),
+      };
+      delete (templateContext as any).fields;
+
+      return await this.generateFiles(templateContext as any, 'system');
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -92,6 +185,13 @@ export class SysToolService implements OnModuleInit {
       if (!table) {
         throw new NotFoundException(`数据表 '${dto.tableName}' 不存在`);
       }
+
+      // 【终极调试】打印出 TypeORM 实际从数据库读取到的表结构。
+      // 这将明确告诉我们，在运行时，代码生成器“看到”了什么。
+      this.logger.debug(
+          `[代码生成器调试] 发现表 '${dto.tableName}'，其结构为: ${JSON.stringify(table, null, 2)}`,
+      );
+
       const isSystemTable = dto.tableName.startsWith('sys_');
       if (!isSystemTable && !dto.pluginDir) {
         throw new BadRequestException("对于非系统表，必须提供 'pluginDir' 字段。");
@@ -106,41 +206,36 @@ export class SysToolService implements OnModuleInit {
 
       const entityName = pascalCase(dto.tableName);
       const modulePrefix = pascalCase(moduleName);
-      const systemFields = [
-        'id',
-        'created_at',
-        'updated_at',
-        'created_by',
-        'updated_by',
-        'deleted_at',
-      ];
 
-      const fields: FieldDto[] = table.columns
-          .filter((column) => !systemFields.includes(column.name.toLowerCase()))
-          .map((column) => ({
-            name: camelCase(column.name),
-            type: this.mapDbTypeToTsType(column.type),
-            comment: column.comment || '',
-            isNullable: column.isNullable,
-          }));
+      const columns = table.columns.map((column) => {
+        const { propertyType, dataType } = this.mapDbColumnToTypeInfo(column);
+        return {
+          isPrimary: column.isPrimary,
+          columnName: camelCase(column.name),
+          propertyType,
+          dataType,
+          columnType: column.type,
+          // 【修复】确保当 length 为空字符串时，其值为 null，以避免在模板中出现 "length: ," 的语法错误
+          length: column.length ? column.length : null,
+          isNullable: column.isNullable,
+          comment: column.comment || '',
+        };
+      });
 
       const columnNames = new Set(
           table.columns.map((c) => c.name.toLowerCase()),
       );
+      // 【修复】检查 'createdat' (小写驼峰) 而不是 'created_at' (蛇形)，以匹配实际的列名
       const hasTimestamps =
-          columnNames.has('created_at') && columnNames.has('updated_at');
+          columnNames.has('createdat') && columnNames.has('updatedat');
+      // 【修复】同上，检查 'createdby'
       const hasUserStamps =
-          columnNames.has('created_by') && columnNames.has('updated_by');
+          columnNames.has('createdby') && columnNames.has('updatedby');
 
-      const templateContext: GenerateCodeDto & {
-        hasTimestamps: boolean;
-        hasUserStamps: boolean;
-        modulePrefix: string;
-        tableName: string;
-      } = {
+      const templateContext = {
         moduleName,
         entityName,
-        fields,
+        columns,
         hasTimestamps,
         hasUserStamps,
         modulePrefix,
@@ -148,7 +243,7 @@ export class SysToolService implements OnModuleInit {
       };
 
       return this.generateFiles(
-          templateContext,
+          templateContext as any, // 转换为 any 以绕过对 generate() 方法的类型检查
           isSystemTable ? 'system' : 'application',
           dto.pluginDir,
       );
@@ -165,25 +260,31 @@ export class SysToolService implements OnModuleInit {
     }
   }
 
-  private mapDbTypeToTsType(
-      dbType: string,
-  ): 'string' | 'number' | 'boolean' | 'Date' {
-    const lowerDbType = dbType.toLowerCase();
+  private mapDbColumnToTypeInfo(column: {
+    type: string;
+  }): { propertyType: string; dataType: string } {
+    const dbType = column.type.toLowerCase();
 
-    const typeMappings = [
-      { keys: ['int', 'integer', 'decimal', 'double', 'float', 'real', 'numeric'], type: 'number' as const },
-      { keys: ['boolean', 'tinyint(1)', 'bit'], type: 'boolean' as const },
-      { keys: ['datetime', 'timestamp', 'date'], type: 'Date' as const },
-      { keys: ['varchar', 'text', 'char', 'string'], type: 'string' as const },
-    ];
-
-    for (const mapping of typeMappings) {
-      if (mapping.keys.some((key) => lowerDbType.includes(key))) {
-        return mapping.type;
-      }
+    if (
+      ['int', 'integer', 'decimal', 'double', 'float', 'real', 'numeric'].some(
+        (k) => dbType.includes(k),
+      )
+    ) {
+      return { propertyType: 'number', dataType: 'number' };
     }
-
-    return 'string';
+    if (['boolean', 'tinyint(1)', 'bit'].some((k) => dbType.includes(k))) {
+      return { propertyType: 'boolean', dataType: 'boolean' };
+    }
+    if (['datetime', 'timestamp', 'date'].some((k) => dbType.includes(k))) {
+      return { propertyType: 'Date', dataType: 'date' };
+    }
+    if (['json', 'jsonb'].some((k) => dbType.includes(k))) {
+      return { propertyType: 'object', dataType: 'json' };
+    }
+    if (dbType.includes('text')) {
+      return { propertyType: 'string', dataType: 'text' };
+    }
+    return { propertyType: 'string', dataType: 'string' };
   }
 
   private pascalToTitleCase(str: string): string {
@@ -246,7 +347,10 @@ export class SysToolService implements OnModuleInit {
   }
 
   private async generateFiles(
-      context: GenerateCodeDto & {
+      context: {
+        moduleName: string;
+        entityName: string;
+        columns: any[];
         hasTimestamps?: boolean;
         hasUserStamps?: boolean;
         modulePrefix?: string;
@@ -271,12 +375,20 @@ export class SysToolService implements OnModuleInit {
       basePath = path.join(process.cwd(), 'src', 'plugins', pluginDir);
     }
 
-    const allTemplateFiles = await fs.readdir(this.templateDir);
+    // 【核心修复】定义一个固定的、符合逻辑依赖的生成顺序。
+    // 这可以从根本上解决因文件生成顺序不确定而导致的 "Cannot find module" 编译错误（竞态条件）。
+    const generationOrder = [
+      'entity.hbs',
+      'query-dto.hbs',
+      'create-dto.hbs',
+      'update-dto.hbs',
+      'delete-dto.hbs', // 确保这个模板存在，因为控制器会引用它
+      'service.hbs',
+      'controller.hbs',
+      'module.hbs',
+    ];
 
-    for (const templateFile of allTemplateFiles) {
-      if (!templateFile.endsWith('.hbs') || templateFile.startsWith('_')) {
-        continue;
-      }
+    for (const templateFile of generationOrder) {
 
       const templateContent = await fs.readFile(
           path.join(this.templateDir, templateFile),
@@ -286,16 +398,15 @@ export class SysToolService implements OnModuleInit {
       const renderedContent = template(context);
 
       let outputDir = basePath;
-      let outputFileName = templateFile.replace('.hbs', '.ts');
+      let outputFileName: string; // 【修复】在循环作用域的开始处声明变量
+      const baseName = path.basename(templateFile, '.hbs'); // e.g., 'entity', 'service', 'create-dto'
 
-      if (outputFileName.includes('-dto')) {
+      if (baseName.includes('-dto')) {
         outputDir = path.join(basePath, 'dto');
-        outputFileName = outputFileName.replace('-dto', `-${moduleName}.dto`);
+        outputFileName = `${baseName.replace('-dto', '')}-${moduleName}.dto.ts`;
       } else {
-        outputFileName = outputFileName.replace(
-            path.basename(outputFileName, '.ts'),
-            moduleName,
-        );
+        // 【修复】确保核心文件（entity, service, controller, module）有正确的、唯一的文件名
+        outputFileName = `${moduleName}.${baseName}.ts`;
       }
 
       const outputPath = path.join(outputDir, outputFileName);

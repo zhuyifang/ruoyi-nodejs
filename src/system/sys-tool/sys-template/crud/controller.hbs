@@ -3,11 +3,12 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, UseGua
 import { AuthGuard } from '@nestjs/passport';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
 import { Plugin{{modulePrefix}}Service } from './{{moduleName}}.service';
-import { Create{{entityName}}Dto } from './dto/create-{{moduleName}}.dto';
-import { Update{{entityName}}Dto } from './dto/update-{{moduleName}}.dto';
-import { Delete{{entityName}}Dto } from './dto/delete-{{moduleName}}.dto';
+// 【优化】导入使用 modulePrefix 命名的DTO
+import { Create{{modulePrefix}}Dto } from './dto/create-{{moduleName}}.dto';
+import { Update{{modulePrefix}}Dto } from './dto/update-{{moduleName}}.dto';
+import { Delete{{modulePrefix}}Dto } from './dto/delete-{{moduleName}}.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
-import { Query{{entityName}}Dto } from './dto/query-{{moduleName}}.dto';
+import { Query{{modulePrefix}}Dto } from './dto/query-{{moduleName}}.dto';
 
 @Controller('/plugins/{{moduleName}}')
 @UseGuards(AuthGuard('jwt'))
@@ -17,13 +18,13 @@ export class Plugin{{modulePrefix}}Controller {
 
     @Post()
     // @RequirePermissions('plugin:{{moduleName}}:add')
-    create(@Body() createDto: Create{{entityName}}Dto) {
+    create(@Body() createDto: Create{{modulePrefix}}Dto) {
         return this.service.create(createDto);
     }
 
     @Get()
     // @RequirePermissions('plugin:{{moduleName}}:list')
-    findAll(@Query() paginationDto: PaginationDto, @Query() queryDto: Query{{entityName}}Dto) {
+    findAll(@Query() paginationDto: PaginationDto, @Query() queryDto: Query{{modulePrefix}}Dto) {
         return this.service.findAll(paginationDto, queryDto);
     }
 
@@ -35,7 +36,7 @@ export class Plugin{{modulePrefix}}Controller {
 
     @Patch(':id')
     // @RequirePermissions('plugin:{{moduleName}}:edit')
-    update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: Update{{entityName}}Dto) {
+    update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: Update{{modulePrefix}}Dto) {
         return this.service.update(id, updateDto);
     }
 
@@ -49,7 +50,7 @@ export class Plugin{{modulePrefix}}Controller {
     @Delete()
     @HttpCode(204)
     // @RequirePermissions('plugin:{{moduleName}}:remove')
-    bulkRemove(@Body() deleteDto: Delete{{entityName}}Dto) {
+    bulkRemove(@Body() deleteDto: Delete{{modulePrefix}}Dto) {
         return this.service.bulkRemove(deleteDto.ids);
     }
 }

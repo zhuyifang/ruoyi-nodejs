@@ -11,7 +11,16 @@ import {
 export class {{entityName}} {
     @PrimaryGeneratedColumn()
     id: number;
-{{> _common-fields isEntity=true}}
+{{!-- 【终极修复】为彻底解决渲染问题，不再使用 partial，直接将字段生成逻辑内联 --}}
+{{#each columns}}
+    {{!-- 为实体生成时，排除主键和所有审计字段，因为它们由专用装饰器处理 --}}
+    {{#unless (or this.isPrimary (isMember this.columnName "createdAt,updatedAt,createdBy,updatedBy"))}}
+
+    {{!-- 【架构升级】使用自定义辅助函数来生成格式完美的装饰器选项 --}}
+    @Column({{{buildColOpts this}}})
+    {{this.columnName}}: {{this.propertyType}};
+    {{/unless}}
+{{/each}}
 
     {{#if hasTimestamps}}
     @CreateDateColumn({ comment: '创建时间' })

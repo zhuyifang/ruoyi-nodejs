@@ -1,8 +1,19 @@
 // src/{{moduleName}}/dto/query-{{moduleName}}.dto.ts
 import { IsString, IsNumber, IsBoolean, IsDate, IsOptional } from 'class-validator';
-import { Type } from 'class-transformer';
+// 【修复】恢复对共享模板的依赖，同时导入需要的模块
+import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
-export class Query{{entityName}}Dto {
-    {{> _common-fields isQueryDto=true}}
+// 【优化】使用 modulePrefix 命名DTO，使其更简洁 (e.g., QuerySinglePageDto)
+export class Query{{modulePrefix}}Dto {
+    {{!-- 【终极修复】为彻底解决渲染问题，不再使用 partial，直接将字段生成逻辑内联 --}}
+{{#each columns}}
+    {{#unless (or this.isPrimary (isEq this.dataType 'text') (isEq this.dataType 'json'))}}
+    {{{buildValidationDecorators this 'query'}}}
+    {{this.columnName}}?: {{this.propertyType}};
+{{#unless @last}}
+
+{{/unless}}
+    {{/unless}}
+{{/each}}
 }

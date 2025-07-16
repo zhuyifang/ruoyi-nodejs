@@ -5,14 +5,16 @@ import { Repository, In } from 'typeorm';
 import { BaseService } from '@/common/services/base.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { {{entityName}} } from './{{moduleName}}.entity';
-import { Create{{entityName}}Dto } from './dto/create-{{moduleName}}.dto';
-import { Update{{entityName}}Dto } from './dto/update-{{moduleName}}.dto';
-import { Query{{entityName}}Dto } from './dto/query-{{moduleName}}.dto';
+// 【优化】导入使用 modulePrefix 命名的DTO
+import { Create{{modulePrefix}}Dto } from './dto/create-{{moduleName}}.dto';
+import { Update{{modulePrefix}}Dto } from './dto/update-{{moduleName}}.dto';
+import { Query{{modulePrefix}}Dto } from './dto/query-{{moduleName}}.dto';
 
 @Injectable()
 // 【修复】统一 Service 类名
 export class Plugin{{modulePrefix}}Service extends BaseService<{{entityName}}> {
-    private readonly safeSortByFields = [{{#each fields}}'{{this.name}}', {{/each}}'createdAt', 'updatedAt'];
+    // 【架构升级】动态生成可排序字段白名单，并严谨地排除不适合排序的字段（如 text/json）和所有审计字段，避免重复。
+    private readonly safeSortByFields = [{{#each columns}}{{#unless (or (isEq this.dataType 'text') (isEq this.dataType 'json') (isMember this.columnName "id,createdAt,updatedAt,createdBy,updatedBy"))}}'{{this.columnName}}', {{/unless}}{{/each}}'id', 'createdAt', 'updatedAt'];
 
     constructor(
         @InjectRepository({{entityName}})
@@ -21,13 +23,13 @@ export class Plugin{{modulePrefix}}Service extends BaseService<{{entityName}}> {
         super({{camelCase modulePrefix}}Repository);
     }
 
-    async create(createDto: Create{{entityName}}Dto): Promise<{{entityName}}> {
+    async create(createDto: Create{{modulePrefix}}Dto): Promise<{{entityName}}> {
         // 【修复】统一 Repository 变量名
         const entity = this.{{camelCase modulePrefix}}Repository.create(createDto);
         return this.{{camelCase modulePrefix}}Repository.save(entity);
     }
 
-    async findAll(paginationDto: PaginationDto, queryDto: Query{{entityName}}Dto): Promise<{ list: {{entityName}}[], total: number }> {
+    async findAll(paginationDto: PaginationDto, queryDto: Query{{modulePrefix}}Dto): Promise<{ list: {{entityName}}[], total: number }> {
         return this.paginate(paginationDto, queryDto, {}, this.safeSortByFields);
     }
 
@@ -40,7 +42,7 @@ export class Plugin{{modulePrefix}}Service extends BaseService<{{entityName}}> {
         return entity;
     }
 
-    async update(id: number, updateDto: Update{{entityName}}Dto): Promise<{{entityName}}> {
+    async update(id: number, updateDto: Update{{modulePrefix}}Dto): Promise<{{entityName}}> {
         const entityToUpdate = await this.findOne(id);
         Object.assign(entityToUpdate, updateDto);
         // 【修复】统一 Repository 变量名

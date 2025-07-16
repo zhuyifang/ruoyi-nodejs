@@ -2,6 +2,16 @@
 import { IsString, IsNumber, IsBoolean, IsDate, IsNotEmpty, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class Create{{entityName}}Dto {
-    {{> _common-fields isCreateDto=true}}
+// 【优化】使用 modulePrefix 命名DTO，使其更简洁 (e.g., CreateSinglePageDto)
+export class Create{{modulePrefix}}Dto {
+    {{!-- 【终极修复】为彻底解决渲染问题，不再使用 partial，直接将字段生成逻辑内联 --}}
+{{#each columns}}
+    {{#unless (or this.isPrimary (isMember this.columnName "createdAt,updatedAt,createdBy,updatedBy"))}}
+    {{{buildValidationDecorators this 'create'}}}
+    {{this.columnName}}: {{this.propertyType}};
+{{#unless @last}}
+
+{{/unless}}
+    {{/unless}}
+{{/each}}
 }

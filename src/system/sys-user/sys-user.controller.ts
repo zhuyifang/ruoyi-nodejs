@@ -17,7 +17,7 @@ export class SysUserController {
 
     @Get() // GET /sys-user
     @RequirePermissions('system:user:list')
-    findAll(@Query() paginationDto: PaginationDto,queryDto : QueryUserDto,) { // 3. 使用 @Query 接收参数
+    findAll(@Query() paginationDto: PaginationDto,@Query()  queryDto : QueryUserDto,) { // 3. 使用 @Query 接收参数
         return this.sysUserService.findAll(paginationDto,queryDto);
     }
 
