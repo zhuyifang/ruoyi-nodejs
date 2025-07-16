@@ -13,6 +13,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { SysMenuService } from './sys-menu.service';
 import { CreateMenuDto } from './dto/create-menu.dto';
+import type { MenuTreeNode } from './sys-menu.service';
 
 @Controller('sys-menu')
 @UseGuards(AuthGuard('jwt')) // 保护整个控制器
@@ -26,7 +27,7 @@ export class SysMenuController {
 
     // 提供一个专门获取树形结构数据的接口
     @Get('tree')
-    findTree() {
+    async findTree(): Promise<MenuTreeNode[]> {
         return this.sysMenuService.findTree();
     }
 

@@ -78,8 +78,8 @@ export class SysMenuSeederService {
         const userMenu = await createAndCollect({
             parentId: systemManagement.id,
             menuName: '用户管理',
-            path: 'user',
-            component: 'system/user/index',
+            path: '/system/user/user',
+            component: '/system/user/index',
             menuType: 'C', // C: 菜单
             perms: 'system:user:list', // 列表权限
             status: true,
@@ -90,8 +90,8 @@ export class SysMenuSeederService {
         const roleMenu = await createAndCollect({
             parentId: systemManagement.id,
             menuName: '角色管理',
-            path: 'role',
-            component: 'system/role/index',
+            path: '/system/role/role',
+            component: '/system/role/index',
             menuType: 'C',
             perms: 'system:role:list',
             status: true,
@@ -102,8 +102,8 @@ export class SysMenuSeederService {
         const menuMenu = await createAndCollect({
             parentId: systemManagement.id,
             menuName: '菜单管理',
-            path: 'menu',
-            component: 'system/menu/index',
+            path: '/system/menu/menu',
+            component: '/system/menu/index',
             menuType: 'C',
             perms: 'system:menu:list',
             status: true,
@@ -127,8 +127,8 @@ export class SysMenuSeederService {
         const genMenu = await createAndCollect({
             parentId: systemTool.id,
             menuName: '代码生成',
-            path: 'gen',
-            component: 'tool/gen/index',
+            path: '/tool/gen/gen',
+            component: '/tool/gen/index',
             menuType: 'C',
             perms: 'system:tool:gen', // 代码生成权限
             status: true,

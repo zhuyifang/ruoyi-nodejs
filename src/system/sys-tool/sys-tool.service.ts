@@ -9,7 +9,8 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+// 【修复】从 typeorm 导入 IsNull
+import { DataSource, IsNull } from 'typeorm';
 import * as path from 'node:path';
 import * as fs from 'fs/promises';
 import * as Handlebars from 'handlebars';
@@ -18,22 +19,28 @@ import { GenerateFromTableDto } from './dto/generate-from-table.dto';
 import { GenerateCodeDto, FieldDto } from './dto/generate-code.dto';
 import { SysMenuService } from '@/system/sys-menu/sys-menu.service';
 import { CreateMenuDto } from '@/system/sys-menu/dto/create-menu.dto';
+import { SysMenu } from '@/system/sys-menu/sys-menu.entity';
+
+export interface MenuTreeNode extends SysMenu {
+  name: string;
+  children?: MenuTreeNode[];
+}
 
 @Injectable()
 export class SysToolService implements OnModuleInit {
   private readonly logger = new Logger(SysToolService.name);
   private readonly templateDir = path.join(
-    process.cwd(),
-    'src',
-    'system',
-    'sys-tool',
-    'sys-template',
-    'crud',
+      process.cwd(),
+      'src',
+      'system',
+      'sys-tool',
+      'sys-template',
+      'crud',
   );
 
   constructor(
-    @InjectDataSource() private readonly dataSource: DataSource,
-    private readonly sysMenuService: SysMenuService,
+      @InjectDataSource() private readonly dataSource: DataSource,
+      private readonly sysMenuService: SysMenuService,
   ) {}
 
   async onModuleInit() {
@@ -53,15 +60,15 @@ export class SysToolService implements OnModuleInit {
       const partialContent = await fs.readFile(partialPath, 'utf-8');
       Handlebars.registerPartial('_common-fields', partialContent);
       this.logger.log(
-        'Successfully registered Handlebars partial: _common-fields',
+          'Successfully registered Handlebars partial: _common-fields',
       );
     } catch (error) {
       this.logger.error(
-        'Failed to register Handlebars partials. Generation will likely fail.',
-        error.stack,
+          'Failed to register Handlebars partials. Generation will likely fail.',
+          error.stack,
       );
       throw new InternalServerErrorException(
-        'Failed to initialize code generator templates.',
+          'Failed to initialize code generator templates.',
       );
     }
   }
@@ -109,21 +116,21 @@ export class SysToolService implements OnModuleInit {
       ];
 
       const fields: FieldDto[] = table.columns
-        .filter((column) => !systemFields.includes(column.name.toLowerCase()))
-        .map((column) => ({
-          name: camelCase(column.name),
-          type: this.mapDbTypeToTsType(column.type),
-          comment: column.comment || '',
-          isNullable: column.isNullable,
-        }));
+          .filter((column) => !systemFields.includes(column.name.toLowerCase()))
+          .map((column) => ({
+            name: camelCase(column.name),
+            type: this.mapDbTypeToTsType(column.type),
+            comment: column.comment || '',
+            isNullable: column.isNullable,
+          }));
 
       const columnNames = new Set(
-        table.columns.map((c) => c.name.toLowerCase()),
+          table.columns.map((c) => c.name.toLowerCase()),
       );
       const hasTimestamps =
-        columnNames.has('created_at') && columnNames.has('updated_at');
+          columnNames.has('created_at') && columnNames.has('updated_at');
       const hasUserStamps =
-        columnNames.has('created_by') && columnNames.has('updated_by');
+          columnNames.has('created_by') && columnNames.has('updated_by');
 
       const templateContext: GenerateCodeDto & {
         hasTimestamps: boolean;
@@ -141,9 +148,9 @@ export class SysToolService implements OnModuleInit {
       };
 
       return this.generateFiles(
-        templateContext,
-        isSystemTable ? 'system' : 'application',
-        dto.pluginDir,
+          templateContext,
+          isSystemTable ? 'system' : 'application',
+          dto.pluginDir,
       );
     } catch (error) {
       if (error instanceof HttpException) {
@@ -151,7 +158,7 @@ export class SysToolService implements OnModuleInit {
       }
       this.logger.error(`从表生成代码失败: ${error.message}`, error.stack);
       throw new InternalServerErrorException(
-        `从表生成代码失败: ${error.message}`,
+          `从表生成代码失败: ${error.message}`,
       );
     } finally {
       await queryRunner.release();
@@ -159,7 +166,7 @@ export class SysToolService implements OnModuleInit {
   }
 
   private mapDbTypeToTsType(
-    dbType: string,
+      dbType: string,
   ): 'string' | 'number' | 'boolean' | 'Date' {
     const lowerDbType = dbType.toLowerCase();
 
@@ -167,7 +174,6 @@ export class SysToolService implements OnModuleInit {
       { keys: ['int', 'integer', 'decimal', 'double', 'float', 'real', 'numeric'], type: 'number' as const },
       { keys: ['boolean', 'tinyint(1)', 'bit'], type: 'boolean' as const },
       { keys: ['datetime', 'timestamp', 'date'], type: 'Date' as const },
-      // 将 string 类型作为默认情况，可以放在最后或不在此处列出
       { keys: ['varchar', 'text', 'char', 'string'], type: 'string' as const },
     ];
 
@@ -185,20 +191,58 @@ export class SysToolService implements OnModuleInit {
     return spaced.replace(/^Sys /, '');
   }
 
+  /**
+   * 【已重构】为模块添加菜单，使其能生成与前端路由匹配的、正确的菜单项
+   * @param moduleName 模块名 (e.g., 'order')
+   * @param entityName 实体名 (e.g., 'Order')
+   */
   private async addModuleToMenu(moduleName: string, entityName: string) {
-      const menuName = `${this.pascalToTitleCase(entityName)}管理`;
-      const menuData: CreateMenuDto = {
-        parentId: 0,
-        menuName: menuName,
-        menuType: 'M',
-        orderNum: 0,
-        path: moduleName,
-        status: true,
-        visible: true,
-        component: 'Layout',
-      };
-      await this.sysMenuService.create(menuData);
-      this.logger.log(`成功为模块 [${moduleName}] 创建顶级菜单: ${menuName}`);
+    const menuRepository = this.dataSource.getRepository(SysMenu);
+
+    // 1. 查找父级菜单，这里我们默认将其放在 "系统工具" 目录下
+    const parentMenu = await menuRepository.findOne({
+      where: { menuName: '系统工具', parentId: IsNull() },
+    });
+
+    if (!parentMenu) {
+      this.logger.warn(
+          `父级菜单 "系统工具" 未找到，跳过为模块 [${moduleName}] 创建菜单。`,
+      );
+      return;
+    }
+
+    // 2. 构造新菜单的 path 和 component，以匹配前端路由生成规则
+    const menuPath = `/${moduleName}/${moduleName}`;
+    const componentPath = `/${moduleName}/index`;
+
+    // 3. 【幂等性校验】检查具有相同路径的菜单是否已存在
+    const existingMenu = await menuRepository.findOne({
+      where: { path: menuPath },
+    });
+
+    if (existingMenu) {
+      this.logger.warn(`路径为 [${menuPath}] 的菜单已存在，跳过创建。`);
+      return;
+    }
+
+    // 4. 【执行创建】创建 'C' 类型的菜单项
+    const menuName = `${this.pascalToTitleCase(entityName)}管理`;
+    const menuData: CreateMenuDto = {
+      parentId: parentMenu.id,
+      menuName: menuName,
+      menuType: 'C', // C: 菜单
+      orderNum: 0,
+      path: menuPath, // 使用符合前端路由的完整路径
+      status: true,
+      visible: true,
+      component: componentPath,
+      perms: `app:${moduleName}:list`, // 为新模块添加默认的列表权限
+    };
+
+    await this.sysMenuService.create(menuData);
+    this.logger.log(
+        `成功在 [${parentMenu.menuName}] 下为模块 [${moduleName}] 创建菜单: ${menuName}`,
+    );
   }
 
   private async generateFiles(
@@ -227,11 +271,9 @@ export class SysToolService implements OnModuleInit {
       basePath = path.join(process.cwd(), 'src', 'plugins', pluginDir);
     }
 
-    // 【优化】动态发现模板，而不是硬编码
     const allTemplateFiles = await fs.readdir(this.templateDir);
 
     for (const templateFile of allTemplateFiles) {
-      // 忽略非 .hbs 文件和 partials (以下划线开头的文件)
       if (!templateFile.endsWith('.hbs') || templateFile.startsWith('_')) {
         continue;
       }
@@ -243,18 +285,15 @@ export class SysToolService implements OnModuleInit {
       const template = Handlebars.compile(templateContent);
       const renderedContent = template(context);
 
-      // 根据模板文件名动态确定输出路径
       let outputDir = basePath;
       let outputFileName = templateFile.replace('.hbs', '.ts');
 
       if (outputFileName.includes('-dto')) {
-        // 如果是 DTO 文件，则放入 'dto' 子目录
         outputDir = path.join(basePath, 'dto');
         outputFileName = outputFileName.replace('-dto', `-${moduleName}.dto`);
       } else {
-        // 其他文件直接使用模块名
         outputFileName = outputFileName.replace(
-            path.basename(outputFileName, '.ts'), // e.g., 'module' or 'controller'
+            path.basename(outputFileName, '.ts'),
             moduleName,
         );
       }
@@ -266,6 +305,7 @@ export class SysToolService implements OnModuleInit {
       this.logger.log(`成功生成文件: ${outputPath}`);
     }
 
+    // 只为应用模块 (非系统模块) 创建菜单
     if (moduleType === 'application') {
       await this.addModuleToMenu(moduleName, entityName);
     }

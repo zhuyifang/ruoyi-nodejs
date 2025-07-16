@@ -1,7 +1,7 @@
 // src/sys-auth/strategies/local.strategy.ts
 import { Strategy } from 'passport-local';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { SysAuthService } from '../sys-auth.service';
 import { SysUser } from 'src/system/sys-user/sys-user.entity';
 
@@ -14,7 +14,7 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     async validate(username: string, password: string): Promise<Omit<SysUser, 'password'>> {
         const user = await this.authService.validateUser(username, password);
         if (!user) {
-            throw new UnauthorizedException('用户名或密码错误');
+            throw new InternalServerErrorException('用户名或密码错误');
         }
         return user;
     }
