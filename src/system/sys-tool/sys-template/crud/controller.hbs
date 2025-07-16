@@ -2,7 +2,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, UseGuards, HttpCode, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
-import { Plugin{{modulePrefix}}Service } from './{{moduleName}}.service';
+import { {{modulePrefix}}Service } from './{{moduleName}}.service';
 // 【优化】导入使用 modulePrefix 命名的DTO
 import { Create{{modulePrefix}}Dto } from './dto/create-{{moduleName}}.dto';
 import { Update{{modulePrefix}}Dto } from './dto/update-{{moduleName}}.dto';
@@ -10,46 +10,46 @@ import { Delete{{modulePrefix}}Dto } from './dto/delete-{{moduleName}}.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { Query{{modulePrefix}}Dto } from './dto/query-{{moduleName}}.dto';
 
-@Controller('/plugins/{{moduleName}}')
+@Controller('{{apiPrefix}}')
 @UseGuards(AuthGuard('jwt'))
 // 【修复】统一 Controller 类名
-export class Plugin{{modulePrefix}}Controller {
-    constructor(private readonly service: Plugin{{modulePrefix}}Service) {}
+export class {{modulePrefix}}Controller {
+    constructor(private readonly service: {{modulePrefix}}Service) {}
 
     @Post()
-    // @RequirePermissions('plugin:{{moduleName}}:add')
+    @RequirePermissions('{{#if (isEq moduleType "system")}}system{{else}}app{{/if}}:{{moduleName}}:add')
     create(@Body() createDto: Create{{modulePrefix}}Dto) {
         return this.service.create(createDto);
     }
 
     @Get()
-    // @RequirePermissions('plugin:{{moduleName}}:list')
+    @RequirePermissions('{{#if (isEq moduleType "system")}}system{{else}}app{{/if}}:{{moduleName}}:list')
     findAll(@Query() paginationDto: PaginationDto, @Query() queryDto: Query{{modulePrefix}}Dto) {
         return this.service.findAll(paginationDto, queryDto);
     }
 
     @Get(':id')
-    // @RequirePermissions('plugin:{{moduleName}}:query')
-    findOne(@Param('id', ParseIntPipe) id: number) {
+    @RequirePermissions('{{#if (isEq moduleType "system")}}system{{else}}app{{/if}}:{{moduleName}}:query')
+    findOne(@Param('id'{{#if (isEq primaryKeyType 'number')}}, ParseIntPipe{{/if}}) id: {{primaryKeyType}}) {
         return this.service.findOne(id);
     }
 
     @Patch(':id')
-    // @RequirePermissions('plugin:{{moduleName}}:edit')
-    update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: Update{{modulePrefix}}Dto) {
+    @RequirePermissions('{{#if (isEq moduleType "system")}}system{{else}}app{{/if}}:{{moduleName}}:edit')
+    update(@Param('id'{{#if (isEq primaryKeyType 'number')}}, ParseIntPipe{{/if}}) id: {{primaryKeyType}}, @Body() updateDto: Update{{modulePrefix}}Dto) {
         return this.service.update(id, updateDto);
     }
 
     @Delete(':id')
     @HttpCode(204)
-    // @RequirePermissions('plugin:{{moduleName}}:remove')
-    remove(@Param('id', ParseIntPipe) id: number) {
+    @RequirePermissions('{{#if (isEq moduleType "system")}}system{{else}}app{{/if}}:{{moduleName}}:remove')
+    remove(@Param('id'{{#if (isEq primaryKeyType 'number')}}, ParseIntPipe{{/if}}) id: {{primaryKeyType}}) {
         return this.service.remove(id);
     }
 
     @Delete()
     @HttpCode(204)
-    // @RequirePermissions('plugin:{{moduleName}}:remove')
+    @RequirePermissions('{{#if (isEq moduleType "system")}}system{{else}}app{{/if}}:{{moduleName}}:remove')
     bulkRemove(@Body() deleteDto: Delete{{modulePrefix}}Dto) {
         return this.service.bulkRemove(deleteDto.ids);
     }

@@ -1,12 +1,12 @@
 // src/sys-role/sys-role.service.ts
-import {Injectable, NotFoundException} from '@nestjs/common';
+import {Injectable, NotFoundException, BadRequestException} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {In, Repository} from 'typeorm';
 import {SysRole} from './sys-role.entity';
 import {CreateRoleDto} from './dto/create-role.dto';
 import {SysMenu} from "../sys-menu/sys-menu.entity";
-import {PaginationDto} from "../../common/dto/pagination.dto";
-import {BaseService} from '../../common/services/base.service';
+import {PaginationDto} from "@/common/dto/pagination.dto";
+import {BaseService} from '@/common/services/base.service';
 import {QueryRoleDto} from "./dto/query-role.dto"; // 导入 BaseService
 
 @Injectable()
@@ -26,19 +26,21 @@ export class SysRoleService extends BaseService<SysRole> { // 继承 BaseService
     }
 
     async findAll(paginationDto: PaginationDto,queryRoleDto: QueryRoleDto,): Promise<{ list: SysRole[], total: number }> {
-        const safeSortByFields = ['id', 'username', 'email'];
+        // [修复] 1. 'SysRole' 实体没有 'username' 或 'email' 字段。安全排序字段应基于 SysRole 的实际字段。
+        const safeSortByFields = ['id', 'roleName', 'roleKey', 'createdAt'];
         return this.paginate(
             paginationDto,
             queryRoleDto,
-            {
-                relations: ['roles'], // SysUser 需要加载 roles 关系
-            },
+            {}, // [修复] 2. 'SysRole' 实体没有 'roles' 关系。列表查询不需要加载任何关系。
             safeSortByFields,
         );
     }
 
     async findOne(id: number): Promise<SysRole> {
-        const role = await this.roleRepository.findOne({where: {id}});
+        const role = await this.roleRepository.findOne({
+            where: { id },
+            relations: ['menus'], // 加载关联的菜单
+        });
         if (!role) {
             throw new NotFoundException(`未找到ID为 ${id} 的角色`);
         }

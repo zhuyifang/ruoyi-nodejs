@@ -5,15 +5,10 @@ import { Repository } from 'typeorm';
 import { SysMenu } from './sys-menu.entity';
 import { CreateMenuDto } from './dto/create-menu.dto';
 
-/**
- * @description 定义返回给前端的树节点接口
- * - 继承自 SysMenu，确保所有原有字段都存在
- * - 添加了前端需要的 'name' 字段
- * - 将 'children' 属性设为可选，因为叶子节点没有此属性
- */
+// [优化] 定义一个包含 children 的菜单节点接口，用于构建树形结构
+// 这个接口将在控制器中作为返回类型，以确保类型安全
 export interface MenuTreeNode extends SysMenu {
-    name: string;
-    children?: MenuTreeNode[];
+    children: MenuTreeNode[];
 }
 
 @Injectable()
@@ -32,47 +27,27 @@ export class SysMenuService {
         const menuMap = new Map<number, MenuTreeNode>();
         const rootMenus: MenuTreeNode[] = [];
 
-        // 第一轮遍历：初始化所有节点，并进行字段映射
+        // 第一轮遍历：初始化所有节点，确保每个节点都有 children 数组
         for (const menu of menus) {
-            const treeNode: MenuTreeNode = {
+            menuMap.set(menu.id, {
                 ...menu,
-                name: menu.menuName, // 【优化】将后端的 menuName 映射为前端需要的 name
-                children: [], // 初始化 children 数组
-            };
-            menuMap.set(menu.id, treeNode);
+                children: [], // [核心] 保证每个节点都有 children 属性
+            });
         }
 
         // 第二轮遍历：构建父子关系
-        for (const treeNode of menuMap.values()) {
-            if (treeNode.parentId && menuMap.has(treeNode.parentId)) {
-                const parentNode = menuMap.get(treeNode.parentId)!;
-
-                // 【修正】增加一个防御性检查，以满足 TypeScript 的严格类型检查
-                // 这能确保我们只在 children 数组确实存在时才执行 push 操作
-                if (parentNode.children) {
-                    parentNode.children.push(treeNode);
-                }
-
+        for (const node of menuMap.values()) {
+            if (node.parentId && menuMap.has(node.parentId)) {
+                const parent = menuMap.get(node.parentId)!;
+                parent.children.push(node);
             } else {
                 // 否则，它是一个根节点
-                rootMenus.push(treeNode);
+                rootMenus.push(node);
             }
         }
 
-        // 【优化】递归清理空的 children 数组，使返回的 JSON 更干净
-        const cleanupEmptyChildren = (nodes: MenuTreeNode[]) => {
-            for (const node of nodes) {
-                if (node.children && node.children.length > 0) {
-                    cleanupEmptyChildren(node.children);
-                } else {
-                    // 如果 children 数组为空或不存在，则删除该属性
-                    delete node.children;
-                }
-            }
-        };
-
-        cleanupEmptyChildren(rootMenus);
-
+        // [核心修复] 直接返回构建好的树，不再删除叶子节点的 'children' 属性。
+        // 这确保了数据结构的统一性，是前端正确渲染的关键。
         return rootMenus;
     }
 

@@ -1,6 +1,8 @@
 // src/{{moduleName}}/{{moduleName}}.entity.ts
 import {
     Entity,
+    // 【核心重构】根据主键类型，我们可能需要 PrimaryColumn
+    PrimaryColumn,
     PrimaryGeneratedColumn,
     Column,
     CreateDateColumn,
@@ -9,18 +11,28 @@ import {
 
 @Entity('{{tableName}}')
 export class {{entityName}} {
-    @PrimaryGeneratedColumn()
-    id: number;
-{{!-- 【终极修复】为彻底解决渲染问题，不再使用 partial，直接将字段生成逻辑内联 --}}
-{{#each columns}}
-    {{!-- 为实体生成时，排除主键和所有审计字段，因为它们由专用装饰器处理 --}}
-    {{#unless (or this.isPrimary (isMember this.columnName "createdAt,updatedAt,createdBy,updatedBy"))}}
+    {{!-- 【核心重构】移除硬编码的 id 字段，动态生成主键和普通列 --}}
+    {{#each columns}}
+        {{#if this.isPrimary}}
+            {{!-- 如果是自增主键，使用 @PrimaryGeneratedColumn --}}
+            {{#if this.isAutoIncrement}}
+    @PrimaryGeneratedColumn({ comment: '{{this.comment}}' })
+            {{!-- 否则，使用 @PrimaryColumn，适用于 UUID 或手动分配的 ID --}}
+            {{else}}
+    @PrimaryColumn({
+        type: '{{this.columnType}}',
+        {{#if this.length}}length: {{this.length}},{{/if}}
+        comment: '{{this.comment}}'
+    })
+            {{/if}}
+    {{this.columnName}}: {{this.propertyType}};
+        {{!-- 对于非主键、非审计字段，使用通用的 @Column --}}
+        {{else if (not (isMember this.columnName "createdAt,updatedAt,createdBy,updatedBy"))}}
 
-    {{!-- 【架构升级】使用自定义辅助函数来生成格式完美的装饰器选项 --}}
     @Column({{{buildColOpts this}}})
     {{this.columnName}}: {{this.propertyType}};
-    {{/unless}}
-{{/each}}
+        {{/if}}
+    {{/each}}
 
     {{#if hasTimestamps}}
     @CreateDateColumn({ comment: '创建时间' })

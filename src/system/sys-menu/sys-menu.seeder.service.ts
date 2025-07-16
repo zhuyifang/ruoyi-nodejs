@@ -50,17 +50,10 @@ export class SysMenuSeederService {
         this.logger.log('Start seeding menus...');
         const allMenus: SysMenu[] = [];
 
-        // 辅助函数，用于简化菜单创建和收集过程
-        const createAndCollect = async (menuData: Partial<SysMenu>) => {
-            const menu = await this.findOrCreate(menuData);
-            allMenus.push(menu);
-            return menu;
-        };
-
         // =================================================================
         // 1. 创建顶级目录：系统管理
         // =================================================================
-        const systemManagement = await createAndCollect({
+        const systemManagement = await this.findOrCreate({
             menuName: '系统管理',
             path: '/system',
             component: 'Layout',
@@ -69,51 +62,57 @@ export class SysMenuSeederService {
             visible: true,
             parentId: null, // 顶级目录的 parentId 为 null
         });
+        allMenus.push(systemManagement);
 
         // =================================================================
         // 2. 在“系统管理”下创建菜单
         // =================================================================
 
         // 2.1 用户管理
-        const userMenu = await createAndCollect({
+        const userMenu = await this.findOrCreate({
             parentId: systemManagement.id,
             menuName: '用户管理',
-            path: '/system/user/user',
-            component: '/system/user/index',
+            path: '/system/user',
+            // 【修复】移除 /index 后缀，以匹配 vite 插件的路由生成规则
+            component: '/system/user',
             menuType: 'C', // C: 菜单
             perms: 'system:user:list', // 列表权限
             status: true,
             visible: true,
         });
+        allMenus.push(userMenu);
 
         // 2.2 角色管理
-        const roleMenu = await createAndCollect({
+        const roleMenu = await this.findOrCreate({
             parentId: systemManagement.id,
             menuName: '角色管理',
-            path: '/system/role/role',
-            component: '/system/role/index',
+            path: '/system/role',
+            // 【修复】移除 /index 后缀
+            component: '/system/role',
             menuType: 'C',
             perms: 'system:role:list',
             status: true,
             visible: true,
         });
+        allMenus.push(roleMenu);
 
         // 2.3 菜单管理
-        const menuMenu = await createAndCollect({
+        const menuMenu = await this.findOrCreate({
             parentId: systemManagement.id,
             menuName: '菜单管理',
-            path: '/system/menu/menu',
-            component: '/system/menu/index',
+            path: '/system/menu',
+            component: '/system/menu',
             menuType: 'C',
             perms: 'system:menu:list',
             status: true,
             visible: true,
         });
+        allMenus.push(menuMenu);
 
         // =================================================================
         // 3. 创建顶级目录：系统工具
         // =================================================================
-        const systemTool = await createAndCollect({
+        const systemTool = await this.findOrCreate({
             menuName: '系统工具',
             path: '/tool',
             component: 'Layout',
@@ -122,19 +121,22 @@ export class SysMenuSeederService {
             visible: true,
             parentId: null,
         });
+        allMenus.push(systemTool);
 
         // 3.1 代码生成
-        const genMenu = await createAndCollect({
+        const genMenu = await this.findOrCreate({
             parentId: systemTool.id,
             menuName: '代码生成',
-            path: '/tool/gen/gen',
-            component: '/tool/gen/index',
+            path: '/tool/gen',
+            // 【修复】移除 /index 后缀
+            component: '/tool/gen',
             menuType: 'C',
             perms: 'system:tool:gen', // 代码生成权限
             status: true,
             visible: true,
         });
-
+        allMenus.push(genMenu);
+        
         this.logger.log('Seeding menus finished.');
         return allMenus;
     }

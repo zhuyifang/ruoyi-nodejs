@@ -12,8 +12,8 @@ import { SysMenuSeederService } from './sys-menu.seeder.service';
     // 注册菜单控制器
     controllers: [SysMenuController],
     // 注册菜单服务
-    providers: [SysMenuService,SysMenuSeederService],
+    providers: [SysMenuService, SysMenuSeederService],
     // 导出菜单服务
-    exports: [SysMenuService,SysMenuSeederService],
+    exports: [SysMenuService, SysMenuSeederService],
 })
 export class SysMenuModule {}

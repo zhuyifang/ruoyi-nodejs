@@ -11,8 +11,8 @@ import { Update{{modulePrefix}}Dto } from './dto/update-{{moduleName}}.dto';
 import { Query{{modulePrefix}}Dto } from './dto/query-{{moduleName}}.dto';
 
 @Injectable()
-// 【修复】统一 Service 类名
-export class Plugin{{modulePrefix}}Service extends BaseService<{{entityName}}> {
+// 【修复】移除硬编码的 'Plugin' 前缀，因为 'modulePrefix' 变量已包含它
+export class {{modulePrefix}}Service extends BaseService<{{entityName}}> {
     // 【架构升级】动态生成可排序字段白名单，并严谨地排除不适合排序的字段（如 text/json）和所有审计字段，避免重复。
     private readonly safeSortByFields = [{{#each columns}}{{#unless (or (isEq this.dataType 'text') (isEq this.dataType 'json') (isMember this.columnName "id,createdAt,updatedAt,createdBy,updatedBy"))}}'{{this.columnName}}', {{/unless}}{{/each}}'id', 'createdAt', 'updatedAt'];
 
@@ -33,36 +33,38 @@ export class Plugin{{modulePrefix}}Service extends BaseService<{{entityName}}> {
         return this.paginate(paginationDto, queryDto, {}, this.safeSortByFields);
     }
 
-    async findOne(id: number): Promise<{{entityName}}> {
+    async findOne({{primaryKeyName}}: {{primaryKeyType}}): Promise<{{entityName}}> {
         // 【修复】统一 Repository 变量名
-        const entity = await this.{{camelCase modulePrefix}}Repository.findOne({ where: { id } });
+        // 【核心重构】使用 findOneBy 和动态主键进行查找
+        const entity = await this.{{camelCase modulePrefix}}Repository.findOneBy({ {{primaryKeyName}} } as any);
         if (!entity) {
-            throw new NotFoundException(`ID 为 ${id} 的记录未找到`);
+            throw new NotFoundException(`主键为 ${{primaryKeyName}} 的记录未找到`);
         }
         return entity;
     }
 
-    async update(id: number, updateDto: Update{{modulePrefix}}Dto): Promise<{{entityName}}> {
-        const entityToUpdate = await this.findOne(id);
+    async update({{primaryKeyName}}: {{primaryKeyType}}, updateDto: Update{{modulePrefix}}Dto): Promise<{{entityName}}> {
+        const entityToUpdate = await this.findOne({{primaryKeyName}});
         Object.assign(entityToUpdate, updateDto);
         // 【修复】统一 Repository 变量名
         return this.{{camelCase modulePrefix}}Repository.save(entityToUpdate);
     }
 
-    async remove(id: number): Promise<void> {
+    async remove({{primaryKeyName}}: {{primaryKeyType}}): Promise<void> {
         // 【修复】统一 Repository 变量名
-        const result = await this.{{camelCase modulePrefix}}Repository.delete(id);
+        const result = await this.{{camelCase modulePrefix}}Repository.delete({{primaryKeyName}});
         if (result.affected === 0) {
-            throw new NotFoundException(`ID 为 ${id} 的记录未找到，无法删除`);
+            throw new NotFoundException(`主键为 ${{primaryKeyName}} 的记录未找到，无法删除`);
         }
     }
 
-    async bulkRemove(ids: number[]): Promise<void> {
+    async bulkRemove(ids: {{primaryKeyType}}[]): Promise<void> {
         if (!ids || ids.length === 0) {
             return;
         }
         // 【修复】统一 Repository 变量名
-        const result = await this.{{camelCase modulePrefix}}Repository.delete({ id: In(ids) } as any);
+        // 【核心重构】使用动态主键进行批量删除
+        const result = await this.{{camelCase modulePrefix}}Repository.delete({ {{primaryKeyName}}: In(ids) } as any);
         if (result.affected === 0) {
             throw new NotFoundException(`提供的 ID 均未找到，无法删除`);
         }

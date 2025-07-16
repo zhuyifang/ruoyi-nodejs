@@ -1,0 +1,77 @@
+import type { DbFieldMetadata, ViewFieldConfig } from 'src/types/forms';
+import { Dictionaries } from 'src/config/dictionaries';
+
+/**
+ * {{entityName}} 模块页面的静态配置。
+ * 这个文件由【代码生成器】生成，开发者可以根据需求进行修改。
+ */
+export const {{camelCase moduleName}}Config = {
+  api: {
+    // 【修复】直接使用在服务层中生成的、保证与后端一致的 apiPrefix
+    list: '{{apiPrefix}}',
+    add: '{{apiPrefix}}',
+    // [修复] 将主键参数类型硬编码为 'string | number'，以严格匹配 useCrud composable 的类型契约。
+    // 这确保了无论数据库主键是数字还是字符串，生成的代码都能与通用 CRUD 逻辑兼容。
+    update: (key: string | number): string => `{{apiPrefix}}/${key}`,
+    delete: (key: string | number): string => `{{apiPrefix}}/${key}`,
+    // 【优化】为批量删除使用专门的 /batch 路径，使其 RESTful 风格更清晰，并避免与 GET / POST 共享根路径。
+    deleteBatch: `{{apiPrefix}}/batch`,
+  },
+  text: {
+    title: '{{pascalToTitleCase entityName}}列表',
+    addBtn: '新增{{pascalToTitleCase entityName}}',
+    dialogTitleAdd: '新增{{pascalToTitleCase entityName}}',
+    dialogTitleEdit: '修改{{pascalToTitleCase entityName}}',
+  },
+  // 【核心重构】明确指定主键字段名，供 useCrud 使用
+  primaryKey: '{{primaryKeyName}}',
+
+  /**
+   * 【第一层：数据库元数据注册表】
+   */
+  fieldRegistry: {
+    {{#each columns}}
+    {{this.columnName}}: { label: '{{this.comment}}', dbType: '{{this.columnType}}', isPrimaryKey: {{this.isPrimary}}, isNullable: {{this.isNullable}}, isAutoIncrement: {{this.isAutoIncrement}}, defaultValue: {{#if this.defaultValue}}'{{this.defaultValue}}'{{else}}null{{/if}} },
+    {{/each}}
+  } as const satisfies Record<string, DbFieldMetadata>,
+
+  /**
+   * 【第三层：视图定义】
+   */
+  columns: [
+    // 【智能生成】默认展示所有列，并自动添加操作列
+    {{#each columns}}
+    '{{this.columnName}}',
+    {{/each}}
+    { name: 'actions', label: '操作', align: 'center' },
+  ] as ViewFieldConfig[],
+
+  searchFields: [
+    // 【智能生成】使用在 service 中推断出的搜索字段
+    {{{searchFields}}}
+  ] as ViewFieldConfig[],
+
+  formFields: [
+    // 【智能生成】使用在 service 中推断出的表单字段，并处理好特殊情况
+    { name: '{{primaryKeyName}}', showOn: 'edit', propsOnEdit: { disable: true } },
+    {{{formFields}}}
+  ] as ViewFieldConfig[],
+
+  searchForm: {
+    // 【智能生成】使用在 service 中推断出的搜索表单初始状态
+    {{{searchForm}}}
+  },
+
+  initialForm: {
+    // 【智能生成】使用在 service 中推断出的新增表单初始状态
+    {{{initialForm}}}
+  },
+
+  /**
+   * 【开发者自定义】
+   * 表单中用到的、非字段本身的数据源，例如下拉框的选项
+   */
+  dataSources: {
+    statusOptions: Dictionaries.commonStatus,
+  }
+};

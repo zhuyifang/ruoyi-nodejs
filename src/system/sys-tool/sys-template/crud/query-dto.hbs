@@ -8,7 +8,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 export class Query{{modulePrefix}}Dto {
     {{!-- 【终极修复】为彻底解决渲染问题，不再使用 partial，直接将字段生成逻辑内联 --}}
 {{#each columns}}
-    {{#unless (or this.isPrimary (isEq this.dataType 'text') (isEq this.dataType 'json'))}}
+    {{!-- 【修复】使用 'any' 辅助函数并只排除主键和JSON类型，以允许文本字段参与后端搜索 --}}
+    {{#unless (any this.isPrimary (isEq this.dataType 'json'))}}
     {{{buildValidationDecorators this 'query'}}}
     {{this.columnName}}?: {{this.propertyType}};
 {{#unless @last}}

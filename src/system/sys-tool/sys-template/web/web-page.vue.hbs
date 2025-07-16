@@ -1,0 +1,158 @@
+<template>
+  <q-page class="flex column">
+    <div class="q-pa-sm">
+      <DynamicForm
+        class="row q-gutter-sm items-center q-pr-sm"
+        v-model="queryParams"
+        :registry="{{camelCase moduleName}}Config.fieldRegistry"
+        :fields="{{camelCase moduleName}}Config.searchFields"
+        mode="search"
+        :data-sources="{{camelCase moduleName}}Config.dataSources"
+      >
+        <q-btn
+          dense
+          color="primary"
+          icon="search"
+          label="搜索"
+          @click="handleSearch"
+        />
+        <q-btn
+          dense
+          color="grey"
+          icon="refresh"
+          label="重置"
+          @click="handleReset"
+        />
+      </DynamicForm>
+    </div>
+    <q-table
+      dense
+      :title="{{camelCase moduleName}}Config.text.title"
+      class="col my-table"
+      v-model:pagination="pagination"
+      :rows="dataList"
+      selection="multiple"
+      v-model:selected="selectedRows"
+      :columns="columns"
+      row-key="id"
+      :loading="loading"
+      sticky-header
+      sticky-first-column
+      sticky-last-column
+      @request="handleTableRequest"
+      @rowClick="handleRowClick"
+    >
+      <template v-slot:top>
+        <q-btn
+          class="q-ma-sm"
+          color="primary"
+          dense
+          outline
+          icon="add"
+          :label="{{camelCase moduleName}}Config.text.addBtn"
+          @click="handleAdd"
+        />
+        <q-btn
+          v-if="selectedRows.length > 0"
+          class="q-ma-sm"
+          color="primary"
+          dense
+          outline
+          icon="delete"
+          label="批量删除"
+          @click="handleBatchDelete"
+        />
+        <q-space/>
+      </template>
+      <template #body-cell-status="props">
+        <q-td :props="props">
+          <q-chip
+            :color="props.row.status ? 'green' : 'red'"
+            text-color="white"
+            dense
+            square
+          >
+            {{{vue "props.row.status ? '启用' : '停用'"}}}
+          </q-chip>
+        </q-td>
+      </template>
+
+      <!-- 自定义操作列 -->
+      <template #body-cell-actions="props">
+        <q-td :props="props" class="q-gutter-x-sm">
+          <q-btn
+            color="primary"
+            icon="edit"
+            size="sm"
+            flat
+            dense
+            @click="handleEdit(props.row)"
+          />
+          <q-btn
+            color="negative"
+            icon="delete"
+            size="sm"
+            flat
+            dense
+            @click="handleDelete(props.row.id)"
+          />
+        </q-td>
+      </template>
+    </q-table>
+
+    <CrudDialog
+      v-model="dialogVisible"
+      :title="dialogTitle"
+      @submit="handleSubmit"
+    >
+      <q-form @submit="handleSubmit">
+        <DynamicForm
+          v-model="formModel"
+          :registry="{{camelCase moduleName}}Config.fieldRegistry"
+          :fields="{{camelCase moduleName}}Config.formFields"
+          :mode="formModel.id ? 'edit' : 'add'"
+          :data-sources="{{camelCase moduleName}}Config.dataSources"
+        />
+      </q-form>
+    </CrudDialog>
+  </q-page>
+</template>
+
+<script setup lang="ts">
+import DynamicForm from 'src/components/DynamicForm.vue';
+import CrudDialog from 'src/components/CrudDialog.vue';
+import { useCrud } from 'src/composables/useCrud';
+import { {{camelCase moduleName}}Config } from './{{moduleName}}.config';
+
+const {
+  loading,
+  dataList,
+  pagination,
+  queryParams,
+  selectedRows,
+  dialogVisible,
+  dialogTitle,
+  formModel,
+  columns,
+  handleTableRequest,
+  handleAdd,
+  handleEdit,
+  handleSubmit,
+  handleDelete,
+  handleBatchDelete,
+  handleSearch,
+  handleReset,
+} = useCrud({{camelCase moduleName}}Config);
+
+function handleRowClick(evt: Event, row: (typeof dataList.value)[0]) {
+  const selectedIndex = selectedRows.value.findIndex(
+    (selectedItem) => selectedItem.id === row.id
+  );
+
+  if (selectedIndex === -1) {
+    selectedRows.value.push(row);
+  } else {
+    selectedRows.value.splice(selectedIndex, 1);
+  }
+}
+</script>

@@ -1,12 +1,19 @@
 // src/{{moduleName}}/dto/delete-{{moduleName}}.dto.ts
-import { IsArray, IsNotEmpty, IsNumber } from 'class-validator';
+// 【核心重构】根据主键类型导入不同的验证器
+import { IsArray, IsNotEmpty, IsNumber, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 // 【优化】使用 modulePrefix 命名DTO，使其更简洁 (e.g., DeleteSinglePageDto)
 export class Delete{{modulePrefix}}Dto {
-    @ApiProperty({ description: '需要删除的ID列表', type: [Number] })
+    // 【核心重构】动态设置 ApiProperty 的类型
+    @ApiProperty({ description: '需要删除的主键列表', type: [{{#if (isEq primaryKeyType 'number')}}Number{{else}}String{{/if}}] })
     @IsArray()
     @IsNotEmpty()
+    // 【核心重构】根据主键类型使用不同的验证器
+    {{#if (isEq primaryKeyType 'number')}}
     @IsNumber({}, { each: true })
-    ids: number[];
+    {{else}}
+    @IsString({ each: true })
+    {{/if}}
+    ids: {{primaryKeyType}}[];
 }

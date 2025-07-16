@@ -15,6 +15,12 @@ export class PaginationDto {
     @Min(1, { message: '页码不能小于1' })
     page?: number = 1;
 
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    pageSize?: number;
+
     @ApiPropertyOptional({
         description: '每页数量',
         default: 10,
